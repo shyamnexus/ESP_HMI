@@ -2,6 +2,7 @@
 #include "esp_log.h"
 #include "esp_lcd_touch_gt911.h"
 #include "esp_lcd_panel_io.h"
+#include "driver/i2c_master.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
@@ -13,9 +14,38 @@ esp_err_t bsp_touch_init(i2c_master_bus_handle_t bus)
 {
     ESP_LOGI(TAG, "Initialising GT911 touch controller");
 
-    /* Create an LCD I2C IO handle (abstraction used by esp_lcd_touch) */
+    /*
+     * The GT911 I2C address is determined by the INT pin state when RST is
+     * released:  INT low → 0x5D,  INT high → 0x14.
+     * On the Waveshare ESP32-S3-Touch-LCD-4.3B the INT line has a board
+     * pull-up, so the GT911 typically boots at 0x14.  Probe both addresses
+     * and use whichever one the chip actually responds to.
+     */
+    static const uint8_t candidates[] = {
+        ESP_LCD_TOUCH_IO_I2C_GT911_ADDRESS,        /* 0x5D – INT low  at reset */
+        ESP_LCD_TOUCH_IO_I2C_GT911_ADDRESS_BACKUP, /* 0x14 – INT high at reset */
+    };
+
+    uint8_t gt911_addr = 0;
+    for (int i = 0; i < 2; i++) {
+        if (i2c_master_probe(bus, candidates[i], pdMS_TO_TICKS(20)) == ESP_OK) {
+            gt911_addr = candidates[i];
+            ESP_LOGI(TAG, "GT911 found at I2C address 0x%02X", gt911_addr);
+            break;
+        }
+        ESP_LOGW(TAG, "GT911 not at 0x%02X", candidates[i]);
+    }
+
+    if (gt911_addr == 0) {
+        ESP_LOGE(TAG, "GT911 not found at any known I2C address (0x%02X or 0x%02X)",
+                 ESP_LCD_TOUCH_IO_I2C_GT911_ADDRESS,
+                 ESP_LCD_TOUCH_IO_I2C_GT911_ADDRESS_BACKUP);
+        return ESP_ERR_NOT_FOUND;
+    }
+
+    /* Create the LCD I2C IO handle at the detected address */
     const esp_lcd_panel_io_i2c_config_t io_cfg = {
-        .dev_addr             = ESP_LCD_TOUCH_IO_I2C_GT911_ADDRESS,
+        .dev_addr             = gt911_addr,
         .scl_speed_hz         = BSP_TOUCH_I2C_FREQ_HZ,
         .control_phase_bytes  = 1,
         .lcd_cmd_bits         = 16,   /* GT911 register address is 16-bit */
