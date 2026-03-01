@@ -78,7 +78,7 @@ static void rebuild_list(void)
 
         /* Device name */
         lv_obj_t *lbl_name = lv_label_create(row);
-        char desc[64];
+        char desc[128];
         if (dev->conn_type == DAQ_CONN_UART) {
             snprintf(desc, sizeof(desc), "%s  (UART%d, %d baud)",
                      dev->name[0] ? dev->name : dev->id,
