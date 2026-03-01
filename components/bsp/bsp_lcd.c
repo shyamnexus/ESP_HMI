@@ -13,6 +13,7 @@ bsp_handles_t g_bsp_handles = {0};
 
 /* Forward declarations from the other BSP source files */
 esp_err_t bsp_io_expander_init(i2c_master_bus_handle_t bus);
+esp_err_t bsp_lcd_rst_pulse(void);
 esp_err_t bsp_touch_reset_pulse(void);
 esp_err_t bsp_touch_init(i2c_master_bus_handle_t bus);
 
@@ -92,14 +93,17 @@ esp_err_t bsp_init(void)
     };
     ESP_ERROR_CHECK(i2c_new_master_bus(&i2c_cfg, &g_bsp_handles.i2c_bus));
 
-    /* --- IO expander (CH422G): backlight + touch reset --- */
+    /* --- IO expander (CH422G): all outputs start low --- */
     ESP_ERROR_CHECK(bsp_io_expander_init(g_bsp_handles.i2c_bus));
 
-    /* --- Hardware-reset the GT911 touch IC via IO expander --- */
-    ESP_ERROR_CHECK(bsp_touch_reset_pulse());
+    /* --- Release LCD RST (IO3) before panel init, per Waveshare reference --- */
+    ESP_ERROR_CHECK(bsp_lcd_rst_pulse());
 
     /* --- RGB LCD panel --- */
     ESP_ERROR_CHECK(lcd_panel_init());
+
+    /* --- GT911 touch reset sequence (INT low → RST pulse → INT float) --- */
+    ESP_ERROR_CHECK(bsp_touch_reset_pulse());
 
     /* --- GT911 capacitive touch --- */
     ESP_ERROR_CHECK(bsp_touch_init(g_bsp_handles.i2c_bus));

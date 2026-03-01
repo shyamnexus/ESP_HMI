@@ -30,6 +30,7 @@
 #include "bsp.h"
 #include "esp_log.h"
 #include "driver/i2c_master.h"
+#include "driver/gpio.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
@@ -39,9 +40,10 @@ static const char *TAG = "BSP_IO";
 #define CH422G_ADDR_MODE    0x24   /**< Mode/config register  */
 #define CH422G_ADDR_OUT     0x38   /**< GPIO output register  */
 
-/* GPIO bit assignments on EXIO header */
-#define CH422G_BIT_TOUCH_RST   (1U << BSP_IO_TOUCH_RST_PIN)   /* EXIO1, bit 0 */
-#define CH422G_BIT_LCD_BL      (1U << BSP_IO_LCD_BL_PIN)      /* EXIO2, bit 1 */
+/* GPIO bit assignments – verified against official Waveshare board config */
+#define CH422G_BIT_TOUCH_RST   (1U << BSP_IO_TOUCH_RST_PIN)   /* IO1, bit 1 – GT911 RST  */
+#define CH422G_BIT_LCD_BL      (1U << BSP_IO_LCD_BL_PIN)      /* IO2, bit 2 – Backlight  */
+#define CH422G_BIT_LCD_RST     (1U << 3)                       /* IO3, bit 3 – LCD RST    */
 
 /* I2C device handles (two handles, two logical registers) */
 static i2c_master_dev_handle_t s_mode_dev = NULL;
@@ -107,17 +109,59 @@ esp_err_t bsp_backlight_set(bool on)
     }
 }
 
+esp_err_t bsp_lcd_rst_pulse(void)
+{
+    if (!s_out_dev) return ESP_ERR_INVALID_STATE;
+
+    /* Assert LCD RST (IO3 low – was already low from init, but be explicit) */
+    ESP_ERROR_CHECK(ch422g_write_out(s_out_val & ~CH422G_BIT_LCD_RST));
+    vTaskDelay(pdMS_TO_TICKS(10));
+
+    /* Release LCD RST (IO3 high) */
+    ESP_ERROR_CHECK(ch422g_write_out(s_out_val | CH422G_BIT_LCD_RST));
+    vTaskDelay(pdMS_TO_TICKS(100));
+
+    return ESP_OK;
+}
+
 esp_err_t bsp_touch_reset_pulse(void)
 {
     if (!s_out_dev) return ESP_ERR_INVALID_STATE;
 
-    /* Assert reset (EXIO1 low) */
-    ESP_ERROR_CHECK(ch422g_write_out(s_out_val & ~CH422G_BIT_TOUCH_RST));
+    /*
+     * GT911 address-select sequence (from official Waveshare board config):
+     *   1. Drive INT LOW  – selects I2C address 0x5D when RST rises
+     *   2. Wait 10 ms
+     *   3. Assert RST LOW (IO1), hold 100 ms
+     *   4. Release RST HIGH  – GT911 latches INT=LOW → address 0x5D
+     *   5. Wait 200 ms for GT911 to complete its internal boot
+     *   6. Release INT as a floating input (GT911 uses it as interrupt output)
+     */
+    const gpio_config_t int_out_cfg = {
+        .pin_bit_mask  = (1ULL << BSP_TOUCH_INT_GPIO),
+        .mode          = GPIO_MODE_OUTPUT,
+        .pull_up_en    = GPIO_PULLUP_DISABLE,
+        .pull_down_en  = GPIO_PULLDOWN_DISABLE,
+        .intr_type     = GPIO_INTR_DISABLE,
+    };
+    gpio_config(&int_out_cfg);
+    gpio_set_level(BSP_TOUCH_INT_GPIO, 0);
     vTaskDelay(pdMS_TO_TICKS(10));
 
-    /* Release reset (EXIO1 high) */
+    ESP_ERROR_CHECK(ch422g_write_out(s_out_val & ~CH422G_BIT_TOUCH_RST));
+    vTaskDelay(pdMS_TO_TICKS(100));
+
     ESP_ERROR_CHECK(ch422g_write_out(s_out_val | CH422G_BIT_TOUCH_RST));
-    vTaskDelay(pdMS_TO_TICKS(50));   /* GT911 boot time */
+    vTaskDelay(pdMS_TO_TICKS(200));
+
+    const gpio_config_t int_in_cfg = {
+        .pin_bit_mask  = (1ULL << BSP_TOUCH_INT_GPIO),
+        .mode          = GPIO_MODE_INPUT,
+        .pull_up_en    = GPIO_PULLUP_DISABLE,
+        .pull_down_en  = GPIO_PULLDOWN_DISABLE,
+        .intr_type     = GPIO_INTR_DISABLE,
+    };
+    gpio_config(&int_in_cfg);
 
     return ESP_OK;
 }
