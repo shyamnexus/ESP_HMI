@@ -1,18 +1,20 @@
 ## IDF Component Manager Manifest File
+## Pinned to versions known to work with ESP-IDF v5.5.2
+
 dependencies:
-  idf: ">=5.1.0"
+  idf: ">=5.5.0"
 
   ## LVGL graphics library
   lvgl/lvgl:
     version: ">=9.1.0,<10.0.0"
 
-  ## Espressif LVGL port for ESP32 (handles task, flush, touch integration)
+  ## Espressif LVGL port for ESP32 — v2.7+ required for LVGL9 color_format field
   espressif/esp_lvgl_port:
-    version: ">=2.3.0"
+    version: ">=2.7.0"
 
   ## GT911 capacitive touch controller driver
   espressif/esp_lcd_touch_gt911:
-    version: ">=1.1.0"
+    version: ">=1.2.0"
 
   ## CH422G IO expander driver (backlight + touch reset control)
   espressif/esp_io_expander_ch422g:

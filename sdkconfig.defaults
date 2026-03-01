@@ -1,10 +1,11 @@
 # ============================================================
-# Target
+# Target — set via "idf.py set-target esp32s3" before first build.
+# Listed here as a safety fallback.
 # ============================================================
 CONFIG_IDF_TARGET="esp32s3"
 
 # ============================================================
-# Flash
+# Flash  (Waveshare 4.3B: 16 MB QIO @ 80 MHz)
 # ============================================================
 CONFIG_ESPTOOLPY_FLASHSIZE_16MB=y
 CONFIG_ESPTOOLPY_FLASHMODE_QIO=y
@@ -13,18 +14,19 @@ CONFIG_PARTITION_TABLE_CUSTOM=y
 CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions.csv"
 
 # ============================================================
-# PSRAM (OPI 8MB on ESP32-S3)
+# PSRAM  (8 MB OPI PSRAM on ESP32-S3)
 # ============================================================
 CONFIG_SPIRAM=y
 CONFIG_SPIRAM_MODE_OCT=y
 CONFIG_SPIRAM_SPEED_80M=y
 CONFIG_SPIRAM_USE_MALLOC=y
+# Keep 16 KB in internal SRAM for DMA-capable allocations.
 CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL=16384
 CONFIG_SPIRAM_TRY_ALLOCATE_WIFI_LWIP=y
 CONFIG_SPIRAM_ALLOW_STACK_EXTERNAL_MEMORY=y
 
 # ============================================================
-# CPU
+# CPU  (240 MHz dual-core)
 # ============================================================
 CONFIG_ESP32S3_DEFAULT_CPU_FREQ_240=y
 
@@ -32,7 +34,6 @@ CONFIG_ESP32S3_DEFAULT_CPU_FREQ_240=y
 # FreeRTOS
 # ============================================================
 CONFIG_FREERTOS_HZ=1000
-CONFIG_FREERTOS_UNICORE=n
 
 # ============================================================
 # Logging
@@ -41,33 +42,34 @@ CONFIG_LOG_DEFAULT_LEVEL_INFO=y
 CONFIG_LOG_MAXIMUM_LEVEL_DEBUG=y
 
 # ============================================================
-# Wi-Fi
+# Wi-Fi  (ESP-IDF v5.x naming convention)
 # ============================================================
-CONFIG_ESP32_WIFI_STATIC_RX_BUFFER_NUM=16
-CONFIG_ESP32_WIFI_DYNAMIC_RX_BUFFER_NUM=64
-CONFIG_ESP32_WIFI_DYNAMIC_TX_BUFFER=y
-CONFIG_ESP32_WIFI_TX_BUFFER_TYPE=1
-CONFIG_ESP32_WIFI_DYNAMIC_TX_BUFFER_NUM=32
-CONFIG_ESP32_WIFI_AMPDU_TX_ENABLED=y
-CONFIG_ESP32_WIFI_AMPDU_RX_ENABLED=y
+CONFIG_ESP_WIFI_STATIC_RX_BUFFER_NUM=16
+CONFIG_ESP_WIFI_DYNAMIC_RX_BUFFER_NUM=64
+CONFIG_ESP_WIFI_DYNAMIC_TX_BUFFER=y
+CONFIG_ESP_WIFI_TX_BUFFER_TYPE=1
+CONFIG_ESP_WIFI_DYNAMIC_TX_BUFFER_NUM=32
+CONFIG_ESP_WIFI_AMPDU_TX_ENABLED=y
+CONFIG_ESP_WIFI_AMPDU_RX_ENABLED=y
 
 # ============================================================
-# Compiler
+# Compiler  (-O2 optimisation)
 # ============================================================
 CONFIG_COMPILER_OPTIMIZATION_PERF=y
 
 # ============================================================
-# NVS encryption (disabled for simplicity; enable in production)
+# NVS encryption (off for development; enable in production)
 # ============================================================
 CONFIG_NVS_ENCRYPTION=n
 
 # ============================================================
-# LVGL - configured via idf_component.yml / managed components
+# LVGL  (managed component — see main/idf_component.yml)
+# Color depth must match the RGB565 panel data width.
 # ============================================================
 CONFIG_LV_COLOR_DEPTH=16
 
-# Fonts used in the HMI (enable all three sizes)
+# Montserrat fonts used by the HMI UI.
+# Enable all three sizes that hmi_main.c and screens reference.
 CONFIG_LV_FONT_MONTSERRAT_12=y
 CONFIG_LV_FONT_MONTSERRAT_14=y
 CONFIG_LV_FONT_MONTSERRAT_28=y
-CONFIG_LV_FONT_DEFAULT_MONTSERRAT_14=y

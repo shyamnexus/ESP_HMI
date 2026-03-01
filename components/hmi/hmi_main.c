@@ -300,13 +300,22 @@ esp_err_t hmi_init(void)
         .panel_handle = bsp->lcd_panel,
         .hres         = HMI_DISPLAY_W,
         .vres         = HMI_DISPLAY_H,
-        /* Double-buffered, full-screen, allocated in PSRAM via direct mode */
+        /* direct_mode: LVGL writes directly to the RGB panel's PSRAM framebuffers.
+         * buffer_size must equal the full framebuffer (h × v pixels).
+         * buff_spiram is intentionally false — the panel owns the framebuffers. */
         .buffer_size  = HMI_DISPLAY_W * HMI_DISPLAY_H,
         .double_buffer = true,
         .monochrome   = false,
+        /* Required for esp_lvgl_port ≥ 2.7 with LVGL 9 */
+        .color_format = LV_COLOR_FORMAT_RGB565,
+        .rotation = {
+            .swap_xy  = false,
+            .mirror_x = false,
+            .mirror_y = false,
+        },
         .flags = {
-            .buff_spiram  = true,
-            .direct_mode  = true,   /* RGB panel: LVGL writes to panel framebuffer */
+            .buff_spiram  = false,  /* Panel owns PSRAM framebuffers in direct_mode */
+            .direct_mode  = true,   /* RGB panel: LVGL writes to panel framebuffer  */
             .full_refresh = true,
         },
     };

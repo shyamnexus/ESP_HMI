@@ -44,6 +44,9 @@ static esp_err_t lcd_panel_init(void)
         /* Bounce buffer: small SRAM staging area while main fb lives in PSRAM.
          * 10 lines × 800 pixels × 2 bytes = 16 KB used from SRAM. */
         .bounce_buffer_size_px = 10 * BSP_LCD_H_RES,
+        /* DMA burst size (power-of-2, added in ESP-IDF v5.3).
+         * 64 bytes aligns well with the PSRAM cache-line on ESP32-S3. */
+        .dma_burst_size = 64,
         .hsync_gpio_num = BSP_LCD_HSYNC_GPIO,
         .vsync_gpio_num = BSP_LCD_VSYNC_GPIO,
         .de_gpio_num    = BSP_LCD_DE_GPIO,
