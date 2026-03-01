@@ -32,9 +32,11 @@ static const char *TAG = "DAQ_WIFI";
 #define WIFI_FAIL_BIT        BIT1
 #define WIFI_MAX_RETRIES     10
 
-static EventGroupHandle_t s_wifi_evg = NULL;
-static int                s_wifi_retry = 0;
+static EventGroupHandle_t s_wifi_evg       = NULL;
+static int                s_wifi_retry     = 0;
 static bool               s_wifi_initialised = false;
+static bool               s_wifi_started     = false;
+static bool               s_wifi_stopping    = false;
 static bool               s_wifi_connected   = false;
 
 static void wifi_event_handler(void *arg, esp_event_base_t base,
@@ -44,7 +46,9 @@ static void wifi_event_handler(void *arg, esp_event_base_t base,
         esp_wifi_connect();
     } else if (base == WIFI_EVENT && id == WIFI_EVENT_STA_DISCONNECTED) {
         s_wifi_connected = false;
-        if (s_wifi_retry < WIFI_MAX_RETRIES) {
+        if (s_wifi_stopping) {
+            /* Intentional stop — suppress auto-retry */
+        } else if (s_wifi_retry < WIFI_MAX_RETRIES) {
             esp_wifi_connect();
             s_wifi_retry++;
             ESP_LOGI(TAG, "Wi-Fi retry %d/%d", s_wifi_retry, WIFI_MAX_RETRIES);
@@ -60,15 +64,12 @@ static void wifi_event_handler(void *arg, esp_event_base_t base,
     }
 }
 
-esp_err_t daq_wifi_connect(const char *ssid, const char *password,
-                           uint32_t timeout_ms)
+esp_err_t daq_wifi_init(void)
 {
-    if (s_wifi_initialised) {
-        ESP_LOGW(TAG, "Wi-Fi already initialised");
-        return s_wifi_connected ? ESP_OK : ESP_ERR_WIFI_NOT_CONNECT;
-    }
+    if (s_wifi_initialised) return ESP_OK;
 
     s_wifi_evg = xEventGroupCreate();
+    if (!s_wifi_evg) return ESP_ERR_NO_MEM;
 
     ESP_ERROR_CHECK(esp_netif_init());
     esp_netif_create_default_wifi_sta();
@@ -81,6 +82,31 @@ esp_err_t daq_wifi_connect(const char *ssid, const char *password,
     ESP_ERROR_CHECK(esp_event_handler_instance_register(
         IP_EVENT, IP_EVENT_STA_GOT_IP, wifi_event_handler, NULL, NULL));
 
+    s_wifi_initialised = true;
+    ESP_LOGI(TAG, "Wi-Fi driver initialised");
+    return ESP_OK;
+}
+
+esp_err_t daq_wifi_connect(const char *ssid, const char *password,
+                           uint32_t timeout_ms)
+{
+    if (!s_wifi_initialised) {
+        ESP_LOGE(TAG, "Call daq_wifi_init() before daq_wifi_connect()");
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    /* Tear down any previous session so we can apply fresh credentials */
+    if (s_wifi_started) {
+        s_wifi_stopping = true;
+        esp_wifi_stop();
+        s_wifi_stopping = false;
+        s_wifi_started   = false;
+        s_wifi_connected = false;
+    }
+
+    xEventGroupClearBits(s_wifi_evg, WIFI_CONNECTED_BIT | WIFI_FAIL_BIT);
+    s_wifi_retry = 0;
+
     wifi_config_t wifi_cfg = {0};
     strncpy((char *)wifi_cfg.sta.ssid,     ssid,     sizeof(wifi_cfg.sta.ssid)     - 1);
     strncpy((char *)wifi_cfg.sta.password, password, sizeof(wifi_cfg.sta.password) - 1);
@@ -91,9 +117,7 @@ esp_err_t daq_wifi_connect(const char *ssid, const char *password,
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
     ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_cfg));
     ESP_ERROR_CHECK(esp_wifi_start());
-
-    s_wifi_initialised = true;
-    s_wifi_retry = 0;
+    s_wifi_started = true;
 
     EventBits_t bits = xEventGroupWaitBits(s_wifi_evg,
                                            WIFI_CONNECTED_BIT | WIFI_FAIL_BIT,

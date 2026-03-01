@@ -95,8 +95,14 @@ esp_err_t daq_manager_set_thresholds(uint8_t dev_idx, uint8_t ch_idx,
  * Wi-Fi helpers (shared between UART and MQTT DAQ)
  * ============================================================ */
 
-/** Connect to Wi-Fi using credentials stored in NVS.
- *  Blocks until connected or timeout_ms elapses. */
+/** Initialise the Wi-Fi driver (netif, esp_wifi_init, event handlers).
+ *  Must be called once at startup, before hmi_init(), so the driver
+ *  can claim its DRAM buffers before LVGL objects are allocated. */
+esp_err_t daq_wifi_init(void);
+
+/** Connect (or reconnect) to Wi-Fi with the supplied credentials.
+ *  Blocks until connected or timeout_ms elapses; run from a
+ *  background task to avoid stalling the LVGL thread. */
 esp_err_t daq_wifi_connect(const char *ssid, const char *password,
                            uint32_t timeout_ms);
 
