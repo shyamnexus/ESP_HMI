@@ -5,7 +5,10 @@
 
 #include <stdio.h>
 #include <string.h>
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 #include "lvgl.h"
+#include "esp_lvgl_port.h"
 #include "esp_log.h"
 #include "nvs_flash.h"
 #include "nvs.h"
@@ -24,6 +27,7 @@ static lv_obj_t *s_ta_ssid    = NULL;
 static lv_obj_t *s_ta_pass    = NULL;
 static lv_obj_t *s_lbl_status = NULL;
 static lv_obj_t *s_slider_bl  = NULL;
+static lv_obj_t *s_keyboard   = NULL;
 
 /* ============================================================
  * NVS helpers
@@ -53,8 +57,61 @@ static void load_wifi_creds(char *ssid, size_t ssid_len,
 /* ============================================================
  * Event handlers
  * ============================================================ */
+static void hide_keyboard(void)
+{
+    if (s_keyboard && !lv_obj_has_flag(s_keyboard, LV_OBJ_FLAG_HIDDEN)) {
+        lv_keyboard_set_textarea(s_keyboard, NULL);
+        lv_obj_add_flag(s_keyboard, LV_OBJ_FLAG_HIDDEN);
+    }
+}
+
+static void ta_focus_cb(lv_event_t *e)
+{
+    lv_obj_t *ta = lv_event_get_target(e);
+    lv_keyboard_set_textarea(s_keyboard, ta);
+    lv_obj_clear_flag(s_keyboard, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_scroll_to_view(ta, LV_ANIM_ON);
+}
+
+static void kb_event_cb(lv_event_t *e)
+{
+    hide_keyboard();
+}
+
+typedef struct {
+    char ssid[64];
+    char pass[64];
+} wifi_connect_args_t;
+
+static bool s_connecting = false;
+
+static void wifi_connect_task(void *arg)
+{
+    wifi_connect_args_t *args = (wifi_connect_args_t *)arg;
+    ESP_LOGI(TAG, "Initiating Wi-Fi connection to: %s", args->ssid);
+    esp_err_t err = daq_wifi_connect(args->ssid, args->pass, 15000);
+    free(args);
+
+    lvgl_port_lock(0);
+    if (err == ESP_OK) {
+        lv_label_set_text(s_lbl_status, "Connected!");
+        lv_obj_set_style_text_color(s_lbl_status, HMI_COL_SUCCESS, 0);
+    } else {
+        lv_label_set_text(s_lbl_status, "Connection failed");
+        lv_obj_set_style_text_color(s_lbl_status, HMI_COL_ALARM, 0);
+    }
+    lvgl_port_unlock();
+
+    s_connecting = false;
+    vTaskDelete(NULL);
+}
+
 static void wifi_connect_cb(lv_event_t *e)
 {
+    hide_keyboard();
+
+    if (s_connecting) return;
+
     const char *ssid = lv_textarea_get_text(s_ta_ssid);
     const char *pass = lv_textarea_get_text(s_ta_pass);
 
@@ -65,16 +122,24 @@ static void wifi_connect_cb(lv_event_t *e)
     }
 
     save_wifi_creds(ssid, pass);
+
+    wifi_connect_args_t *args = malloc(sizeof(wifi_connect_args_t));
+    if (!args) {
+        lv_label_set_text(s_lbl_status, "Error: out of memory");
+        lv_obj_set_style_text_color(s_lbl_status, HMI_COL_ALARM, 0);
+        return;
+    }
+    strncpy(args->ssid, ssid, sizeof(args->ssid) - 1);
+    strncpy(args->pass, pass, sizeof(args->pass) - 1);
+
     lv_label_set_text(s_lbl_status, "Connecting…");
     lv_obj_set_style_text_color(s_lbl_status, HMI_COL_WARNING, 0);
 
-    ESP_LOGI(TAG, "Initiating Wi-Fi connection to: %s", ssid);
-    esp_err_t err = daq_wifi_connect(ssid, pass, 15000);
-    if (err == ESP_OK) {
-        lv_label_set_text(s_lbl_status, "Connected!");
-        lv_obj_set_style_text_color(s_lbl_status, HMI_COL_SUCCESS, 0);
-    } else {
-        lv_label_set_text(s_lbl_status, "Connection failed");
+    s_connecting = true;
+    if (xTaskCreate(wifi_connect_task, "wifi_conn", 4096, args, 5, NULL) != pdPASS) {
+        s_connecting = false;
+        free(args);
+        lv_label_set_text(s_lbl_status, "Error: task creation failed");
         lv_obj_set_style_text_color(s_lbl_status, HMI_COL_ALARM, 0);
     }
 }
@@ -144,6 +209,7 @@ lv_obj_t *screen_settings_create(lv_obj_t *parent)
     lv_textarea_set_one_line(s_ta_ssid, true);
     lv_textarea_set_placeholder_text(s_ta_ssid, "Network name");
     lv_obj_set_style_text_font(s_ta_ssid, &lv_font_montserrat_12, 0);
+    lv_obj_add_event_cb(s_ta_ssid, ta_focus_cb, LV_EVENT_FOCUSED, NULL);
 
     lv_obj_t *lbl_pass = lv_label_create(wifi_card);
     lv_label_set_text(lbl_pass, "Pass:");
@@ -157,6 +223,7 @@ lv_obj_t *screen_settings_create(lv_obj_t *parent)
     lv_textarea_set_password_mode(s_ta_pass, true);
     lv_textarea_set_placeholder_text(s_ta_pass, "Password");
     lv_obj_set_style_text_font(s_ta_pass, &lv_font_montserrat_12, 0);
+    lv_obj_add_event_cb(s_ta_pass, ta_focus_cb, LV_EVENT_FOCUSED, NULL);
 
     /* Load saved creds */
     char ssid_buf[64] = {0}, pass_buf[64] = {0};
@@ -222,6 +289,14 @@ lv_obj_t *screen_settings_create(lv_obj_t *parent)
     lv_obj_set_style_text_font(lbl_save, &lv_font_montserrat_12, 0);
     lv_obj_center(lbl_save);
     lv_obj_add_event_cb(btn_save, save_all_cb, LV_EVENT_CLICKED, NULL);
+
+    /* ── On-screen keyboard (hidden until a textarea is focused) ── */
+    s_keyboard = lv_keyboard_create(parent);
+    lv_obj_set_size(s_keyboard, HMI_DISPLAY_W, 200);
+    lv_obj_align(s_keyboard, LV_ALIGN_BOTTOM_MID, 0, 0);
+    lv_obj_add_flag(s_keyboard, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_event_cb(s_keyboard, kb_event_cb, LV_EVENT_READY,  NULL);
+    lv_obj_add_event_cb(s_keyboard, kb_event_cb, LV_EVENT_CANCEL, NULL);
 
     return s_panel;
 }

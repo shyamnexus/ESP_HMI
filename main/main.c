@@ -43,6 +43,10 @@ void app_main(void)
     ESP_LOGI(TAG, "Initialising DAQ manager...");
     ESP_ERROR_CHECK(daq_manager_init());
 
+    /* Wi-Fi driver: claim DRAM buffers now, before LVGL allocates objects */
+    ESP_LOGI(TAG, "Initialising Wi-Fi driver...");
+    ESP_ERROR_CHECK(daq_wifi_init());
+
     /* HMI: LVGL task, screens, data binding */
     ESP_LOGI(TAG, "Initialising HMI...");
     ESP_ERROR_CHECK(hmi_init());

@@ -20,8 +20,13 @@ CONFIG_SPIRAM=y
 CONFIG_SPIRAM_MODE_OCT=y
 CONFIG_SPIRAM_SPEED_80M=y
 CONFIG_SPIRAM_USE_MALLOC=y
-# Keep 16 KB in internal SRAM for DMA-capable allocations.
+# Allocations <= 16 KB prefer internal SRAM; larger go to PSRAM.
 CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL=16384
+# Reserve 80 KB of internal SRAM for DMA / MALLOC_CAP_INTERNAL use.
+# Budget: LCD bounce buffers (2×10×800×2 = 32 KB)
+#       + Wi-Fi static RX    (10×1600    = 16 KB)
+#       + DMA descriptors + headroom    ~ 32 KB
+CONFIG_SPIRAM_MALLOC_RESERVE_INTERNAL=81920
 CONFIG_SPIRAM_TRY_ALLOCATE_WIFI_LWIP=y
 CONFIG_SPIRAM_ALLOW_STACK_EXTERNAL_MEMORY=y
 
@@ -44,7 +49,10 @@ CONFIG_LOG_MAXIMUM_LEVEL_DEBUG=y
 # ============================================================
 # Wi-Fi  (ESP-IDF v5.x naming convention)
 # ============================================================
-CONFIG_ESP_WIFI_STATIC_RX_BUFFER_NUM=16
+# Reduced from 16 → 10 to ease DMA SRAM pressure (saves 9.6 KB).
+# Dynamic RX buffers (heap, can use PSRAM via SPIRAM_TRY_ALLOCATE_WIFI_LWIP)
+# handle burst traffic above the static count.
+CONFIG_ESP_WIFI_STATIC_RX_BUFFER_NUM=10
 CONFIG_ESP_WIFI_DYNAMIC_RX_BUFFER_NUM=64
 CONFIG_ESP_WIFI_DYNAMIC_TX_BUFFER=y
 CONFIG_ESP_WIFI_TX_BUFFER_TYPE=1
