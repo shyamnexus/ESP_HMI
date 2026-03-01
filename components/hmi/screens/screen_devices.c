@@ -23,6 +23,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <math.h>
 #include "lvgl.h"
 #include "hmi.h"
 #include "daq_manager.h"
