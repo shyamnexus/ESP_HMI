@@ -10,16 +10,17 @@
  *   0x38  –  OUTPUT register (write bit-mask → drive GPIO pins)
  *   0x26  –  INPUT register  (read  bit-mask ← sample GPIO pins)
  *
- * On the 4.3B board the relevant output bits are:
- *   bit 0  –  EXIO1  (GT911 touch-reset, active-low)
- *   bit 1  –  EXIO2  (LCD backlight enable, active-high)
+ * On the 4.3B board the relevant output bits are (confirmed from schematic):
+ *   bit 1 (IO1)  –  CTP_RST  (GT911 touch-reset, active-low)
+ *   bit 2 (IO2)  –  BL_CTRL  (LCD backlight enable, active-high)
+ *   bit 3 (IO3)  –  LCD_RST  (RGB panel reset, not used in direct-drive mode)
  *
  * Sequence to enable all peripherals:
  *   1. Write 0x01 to 0x24  → GPIO output mode
- *   2. Write 0x00 to 0x38  → all outputs low  (touch in reset)
- *   3. Wait 10 ms, write 0x01 → release touch reset (EXIO1 high)
+ *   2. Write 0x00 to 0x38  → all outputs low  (touch in reset, BL off)
+ *   3. Wait 10 ms, write 0x02 → release touch reset (IO1 high)
  *   4. Wait 50 ms for GT911 to boot
- *   5. Write 0x03 to 0x38  → backlight on  (EXIO1=1, EXIO2=1)
+ *   5. Write 0x06 to 0x38  → backlight on  (IO1=1, IO2=1)
  *
  * References:
  *   • ESPHome CH422G driver source (api-docs.esphome.io/ch422g_8cpp_source)

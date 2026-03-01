@@ -68,12 +68,20 @@ extern "C" {
 #define BSP_TOUCH_INT_GPIO      GPIO_NUM_4
 #define BSP_TOUCH_I2C_FREQ_HZ   400000
 
-/* --- CH422G IO expander – EXIO pin bit positions ------------- */
+/* --- CH422G IO expander – output register bit positions ------- */
 /* The CH422G uses I2C address 0x24 (mode) and 0x38 (output);
  * these constants identify which bit in the output byte controls
- * each function.  See bsp_io_expander.c for the full protocol. */
-#define BSP_IO_TOUCH_RST_PIN    0   /* bit 0 = EXIO1 – GT911 reset (active-low) */
-#define BSP_IO_LCD_BL_PIN       1   /* bit 1 = EXIO2 – LCD backlight enable      */
+ * each function.  See bsp_io_expander.c for the full protocol.
+ *
+ * Bit mapping confirmed from the Waveshare ESP32-S3-Touch-LCD-4.3B
+ * schematic and ESPHome community reference:
+ *   IO0 (bit 0) – not connected / reserved
+ *   IO1 (bit 1) – CTP_RST  : GT911 touch reset, active-low
+ *   IO2 (bit 2) – BL_CTRL  : LCD backlight enable, active-high
+ *   IO3 (bit 3) – LCD_RST  : RGB panel reset (not used for direct-drive)
+ */
+#define BSP_IO_TOUCH_RST_PIN    1   /* bit 1 = IO1 – GT911 reset (active-low)   */
+#define BSP_IO_LCD_BL_PIN       2   /* bit 2 = IO2 – LCD backlight enable        */
 
 /* ============================================================
  * Public types
