@@ -29,7 +29,6 @@
 #include "bsp.h"
 #include "esp_log.h"
 #include "driver/i2c_master.h"
-#include "driver/gpio.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
@@ -111,46 +110,13 @@ esp_err_t bsp_touch_reset_pulse(void)
 {
     if (!s_out_dev) return ESP_ERR_INVALID_STATE;
 
-    /*
-     * GT911 I2C address selection:
-     *   INT = LOW  while RST rises  →  address 0x5D (ESP_LCD_TOUCH_IO_I2C_GT911_ADDRESS)
-     *   INT = HIGH while RST rises  →  address 0x14 (backup)
-     *
-     * The board has a pull-up on the INT line, so without explicit control the
-     * GT911 would boot at 0x14, causing an I2C NAK when the driver tries 0x5D.
-     * Drive INT output-low before asserting reset so we get a known address.
-     */
-    const gpio_config_t int_out_cfg = {
-        .pin_bit_mask    = (1ULL << BSP_TOUCH_INT_GPIO),
-        .mode            = GPIO_MODE_OUTPUT,
-        .pull_up_en      = GPIO_PULLUP_DISABLE,
-        .pull_down_en    = GPIO_PULLDOWN_DISABLE,
-        .intr_type       = GPIO_INTR_DISABLE,
-    };
-    gpio_config(&int_out_cfg);
-    gpio_set_level(BSP_TOUCH_INT_GPIO, 0);
-
     /* Assert reset (EXIO1 low) */
     ESP_ERROR_CHECK(ch422g_write_out(s_out_val & ~CH422G_BIT_TOUCH_RST));
     vTaskDelay(pdMS_TO_TICKS(10));
 
-    /* Release reset; GT911 latches address on the RST rising edge */
+    /* Release reset (EXIO1 high) */
     ESP_ERROR_CHECK(ch422g_write_out(s_out_val | CH422G_BIT_TOUCH_RST));
-
-    /* Hold INT low for ≥ 5 ms after RST rises so the address is firmly latched */
-    vTaskDelay(pdMS_TO_TICKS(5));
-
-    /* Release INT – float as input so GT911 can drive it as an interrupt output */
-    const gpio_config_t int_in_cfg = {
-        .pin_bit_mask    = (1ULL << BSP_TOUCH_INT_GPIO),
-        .mode            = GPIO_MODE_INPUT,
-        .pull_up_en      = GPIO_PULLUP_DISABLE,
-        .pull_down_en    = GPIO_PULLDOWN_DISABLE,
-        .intr_type       = GPIO_INTR_DISABLE,
-    };
-    gpio_config(&int_in_cfg);
-
-    vTaskDelay(pdMS_TO_TICKS(50));   /* GT911 internal boot time */
+    vTaskDelay(pdMS_TO_TICKS(50));   /* GT911 boot time */
 
     return ESP_OK;
 }
