@@ -289,7 +289,7 @@ esp_err_t hmi_init(void)
     /* --- Initialise LVGL port --- */
     lvgl_port_cfg_t port_cfg = ESP_LVGL_PORT_INIT_CONFIG();
     port_cfg.task_priority  = 4;
-    port_cfg.task_stack_size = 8192;
+    port_cfg.task_stack = 8192;
     port_cfg.task_affinity  = 1;   /* Core 1 */
     port_cfg.timer_period_ms = 5;  /* 5 ms LVGL tick */
     ESP_ERROR_CHECK(lvgl_port_init(&port_cfg));
