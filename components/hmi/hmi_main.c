@@ -294,19 +294,24 @@ esp_err_t hmi_init(void)
     port_cfg.timer_period_ms = 5;  /* 5 ms LVGL tick */
     ESP_ERROR_CHECK(lvgl_port_init(&port_cfg));
 
-    /* --- Add RGB display --- */
+    /* --- Add RGB display ---
+     * lvgl_port_add_disp() is for SPI/I2C panels only and asserts io_handle != NULL.
+     * RGB panels must use lvgl_port_add_disp_rgb() with an rgb_cfg:
+     *   avoid_tearing = true  → library fetches the panel's own PSRAM framebuffers
+     *                           via esp_lcd_rgb_panel_get_frame_buffer() and gives
+     *                           them to LVGL as direct-mode draw buffers (no extra
+     *                           allocation, no copy).
+     *   bb_mode       = true  → sync LVGL via on_bounce_frame_finish callback,
+     *                           which matches the bounce_buffer_size_px set in the
+     *                           RGB panel config (fires once per complete frame). */
     const lvgl_port_display_cfg_t disp_cfg = {
-        .io_handle    = NULL,
+        .io_handle    = NULL,           /* Not used by RGB panels             */
         .panel_handle = bsp->lcd_panel,
         .hres         = HMI_DISPLAY_W,
         .vres         = HMI_DISPLAY_H,
-        /* direct_mode: LVGL writes directly to the RGB panel's PSRAM framebuffers.
-         * buffer_size must equal the full framebuffer (h × v pixels).
-         * buff_spiram is intentionally false — the panel owns the framebuffers. */
         .buffer_size  = HMI_DISPLAY_W * HMI_DISPLAY_H,
         .double_buffer = true,
         .monochrome   = false,
-        /* Required for esp_lvgl_port ≥ 2.7 with LVGL 9 */
         .color_format = LV_COLOR_FORMAT_RGB565,
         .rotation = {
             .swap_xy  = false,
@@ -314,12 +319,17 @@ esp_err_t hmi_init(void)
             .mirror_y = false,
         },
         .flags = {
-            .buff_spiram  = false,  /* Panel owns PSRAM framebuffers in direct_mode */
-            .direct_mode  = true,   /* RGB panel: LVGL writes to panel framebuffer  */
+            .direct_mode  = true,
             .full_refresh = true,
         },
     };
-    g_disp = lvgl_port_add_disp(&disp_cfg);
+    const lvgl_port_display_rgb_cfg_t rgb_cfg = {
+        .flags = {
+            .bb_mode       = true,  /* bounce-buffer panel → use frame-finish CB */
+            .avoid_tearing = true,  /* use panel PSRAM fbs as LVGL draw buffers  */
+        },
+    };
+    g_disp = lvgl_port_add_disp_rgb(&disp_cfg, &rgb_cfg);
     if (!g_disp) {
         ESP_LOGE(TAG, "Failed to add LVGL display");
         return ESP_FAIL;
