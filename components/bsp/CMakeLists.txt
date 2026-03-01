@@ -9,6 +9,7 @@ idf_component_register(
         esp_lcd
         esp_lcd_touch
         esp_lcd_touch_gt911
-        esp_io_expander_ch422g
         log
+    # CH422G IO expander is driven via raw I2C (driver/i2c_master).
+    # No extra component needed — see bsp_io_expander.c.
 )

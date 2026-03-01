@@ -4,7 +4,6 @@
 #include "esp_lcd_panel_ops.h"
 #include "esp_lcd_touch.h"
 #include "driver/i2c_master.h"
-#include "esp_io_expander.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -31,7 +30,7 @@ extern "C" {
 #define BSP_LCD_HSYNC_GPIO      GPIO_NUM_46
 #define BSP_LCD_VSYNC_GPIO      GPIO_NUM_3
 #define BSP_LCD_DE_GPIO         GPIO_NUM_5
-#define BSP_LCD_DISP_GPIO       GPIO_NUM_NC   /* Backlight via IO expander */
+#define BSP_LCD_DISP_GPIO       GPIO_NUM_NC   /* Backlight via CH422G */
 
 /* --- RGB565 data lines (bit 0 = B[0], bit 15 = R[4]) --------- */
 /* Blue  [B3..B7]  → data bits [0..4]  */
@@ -69,25 +68,21 @@ extern "C" {
 #define BSP_TOUCH_INT_GPIO      GPIO_NUM_4
 #define BSP_TOUCH_I2C_FREQ_HZ   400000
 
-/* --- CH422G IO expander (shared I2C bus) --------------------- */
-/* I2C device address for CH422G in GPIO mode.
- * If backlight / reset does not respond, verify the address
- * against the actual chip on your board revision. */
-#define BSP_IO_EXPANDER_ADDR    0x24
-
-/* IO expander pin assignments (0-indexed bit position) */
-#define BSP_IO_TOUCH_RST_PIN    0   /* EXIO1 – active-low touch reset  */
-#define BSP_IO_LCD_BL_PIN       1   /* EXIO2 – LCD backlight enable     */
+/* --- CH422G IO expander – EXIO pin bit positions ------------- */
+/* The CH422G uses I2C address 0x24 (mode) and 0x38 (output);
+ * these constants identify which bit in the output byte controls
+ * each function.  See bsp_io_expander.c for the full protocol. */
+#define BSP_IO_TOUCH_RST_PIN    0   /* bit 0 = EXIO1 – GT911 reset (active-low) */
+#define BSP_IO_LCD_BL_PIN       1   /* bit 1 = EXIO2 – LCD backlight enable      */
 
 /* ============================================================
  * Public types
  * ============================================================ */
 
 typedef struct {
-    i2c_master_bus_handle_t  i2c_bus;
-    esp_io_expander_handle_t io_expander;
-    esp_lcd_panel_handle_t   lcd_panel;
-    esp_lcd_touch_handle_t   touch;
+    i2c_master_bus_handle_t  i2c_bus;    /**< Shared I2C bus (touch + CH422G) */
+    esp_lcd_panel_handle_t   lcd_panel;  /**< RGB LCD panel handle             */
+    esp_lcd_touch_handle_t   touch;      /**< GT911 touch handle               */
 } bsp_handles_t;
 
 /* ============================================================
@@ -97,8 +92,8 @@ typedef struct {
 /**
  * @brief  Initialise all board peripherals in the correct order.
  *
- * Sequence: I2C → IO expander → touch reset → LCD panel → touch init → backlight on.
- * On return, all handles in @p handles are valid.
+ * Sequence: I2C bus → CH422G (touch in reset, BL off) →
+ *           touch reset pulse → RGB LCD panel → GT911 touch → BL on.
  */
 esp_err_t bsp_init(void);
 
