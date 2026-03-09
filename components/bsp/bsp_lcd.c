@@ -43,8 +43,10 @@ static esp_err_t lcd_panel_init(void)
         .bits_per_pixel = 16,
         .num_fbs        = 2,      /* Double-buffered, allocated in PSRAM */
         /* Bounce buffer: small SRAM staging area while main fb lives in PSRAM.
-         * 10 lines × 800 pixels × 2 bytes = 16 KB used from SRAM. */
-        .bounce_buffer_size_px = 10 * BSP_LCD_H_RES,
+         * 4 lines × 800 pixels × 2 bytes = 6.4 KB per buffer (×2 = 12.8 KB).
+         * Reduced from 10 lines to leave headroom in the DMA SRAM pool after
+         * the Wi-Fi driver has claimed its ~92 KB of internal buffers. */
+        .bounce_buffer_size_px = 4 * BSP_LCD_H_RES,
         /* DMA burst size (power-of-2, added in ESP-IDF v5.3).
          * 64 bytes aligns well with the PSRAM cache-line on ESP32-S3. */
         .dma_burst_size = 64,
