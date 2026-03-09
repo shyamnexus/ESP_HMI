@@ -3,7 +3,7 @@
  * @brief DAQ device management screen.
  *
  * Shows a list of registered DAQ devices with their connection status.
- * Provides a form to add new UART or MQTT devices.
+ * Provides a form to add new UART, MQTT, or TCP devices.
  *
  * Layout (800 × 380):
  *   ┌────────────────────────────────────────────────────────────┐
@@ -11,6 +11,7 @@
  *   │  ┌──────────────────────────────────────────────────────┐  │
  *   │  │  DAQ1  (UART0 / 115200)       ● Connected  [Remove]  │  │
  *   │  │  DAQ2  (MQTT / broker:1883)   ○ Error      [Remove]  │  │
+ *   │  │  DAQ3  (TCP  / 192.168.1.5:8080) ● Connected [Remove]│  │
  *   │  └──────────────────────────────────────────────────────┘  │
  *   │  ┌─ Add Device form (shown on "+ Add Device" tap) ───────┐ │
  *   │  │  Name: ___________  Type: [UART ▼]                    │ │
@@ -34,14 +35,17 @@ static lv_obj_t *s_add_form   = NULL;
 static bool      s_form_open  = false;
 
 /* Form widgets */
-static lv_obj_t *s_ta_name    = NULL;
-static lv_obj_t *s_dd_type    = NULL;
-static lv_obj_t *s_dd_port    = NULL;
-static lv_obj_t *s_dd_baud    = NULL;
-static lv_obj_t *s_ta_host    = NULL;
-static lv_obj_t *s_ta_topic   = NULL;
-static lv_obj_t *s_row_uart   = NULL;
-static lv_obj_t *s_row_mqtt   = NULL;
+static lv_obj_t *s_ta_name      = NULL;
+static lv_obj_t *s_dd_type      = NULL;
+static lv_obj_t *s_dd_port      = NULL;
+static lv_obj_t *s_dd_baud      = NULL;
+static lv_obj_t *s_ta_host      = NULL;
+static lv_obj_t *s_ta_topic     = NULL;
+static lv_obj_t *s_row_uart     = NULL;
+static lv_obj_t *s_row_mqtt     = NULL;
+static lv_obj_t *s_row_tcp      = NULL;
+static lv_obj_t *s_ta_tcp_host  = NULL;
+static lv_obj_t *s_ta_tcp_port  = NULL;
 
 /* ============================================================
  * Remove button callback
@@ -130,18 +134,22 @@ static void rebuild_list(void)
 }
 
 /* ============================================================
- * Form type-selector → show/hide UART vs MQTT rows
+ * Form type-selector → show/hide UART / MQTT / TCP rows
  * ============================================================ */
 static void type_dd_cb(lv_event_t *e)
 {
     uint16_t sel = lv_dropdown_get_selected(s_dd_type);
-    /* 0 = UART, 1 = MQTT */
+    /* 0 = UART, 1 = MQTT, 2 = TCP */
+    lv_obj_add_flag(s_row_uart, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(s_row_mqtt, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(s_row_tcp,  LV_OBJ_FLAG_HIDDEN);
+
     if (sel == 0) {
         lv_obj_clear_flag(s_row_uart, LV_OBJ_FLAG_HIDDEN);
-        lv_obj_add_flag(s_row_mqtt, LV_OBJ_FLAG_HIDDEN);
-    } else {
-        lv_obj_add_flag(s_row_uart, LV_OBJ_FLAG_HIDDEN);
+    } else if (sel == 1) {
         lv_obj_clear_flag(s_row_mqtt, LV_OBJ_FLAG_HIDDEN);
+    } else {
+        lv_obj_clear_flag(s_row_tcp, LV_OBJ_FLAG_HIDDEN);
     }
 }
 
@@ -170,7 +178,7 @@ static void add_confirm_cb(lv_event_t *e)
         } else {
             dev.conn.uart.baud_rate = 115200;
         }
-    } else {
+    } else if (type_sel == 1) {
         /* MQTT */
         dev.conn_type = DAQ_CONN_WIFI_MQTT;
         strncpy(dev.conn.mqtt.broker_uri, lv_textarea_get_text(s_ta_host),
@@ -178,6 +186,13 @@ static void add_confirm_cb(lv_event_t *e)
         strncpy(dev.conn.mqtt.topic, lv_textarea_get_text(s_ta_topic),
                 sizeof(dev.conn.mqtt.topic) - 1);
         strncpy(dev.conn.mqtt.client_id, dev.id, DAQ_ID_LEN - 1);
+    } else {
+        /* TCP */
+        dev.conn_type = DAQ_CONN_WIFI_TCP;
+        strncpy(dev.conn.tcp.host, lv_textarea_get_text(s_ta_tcp_host),
+                sizeof(dev.conn.tcp.host) - 1);
+        dev.conn.tcp.port = (uint16_t)atoi(lv_textarea_get_text(s_ta_tcp_port));
+        if (dev.conn.tcp.port == 0) dev.conn.tcp.port = 8080;
     }
 
     /* Initialise thresholds to NaN */
@@ -251,7 +266,7 @@ static void build_add_form(lv_obj_t *parent)
     lv_obj_align(lbl_type, LV_ALIGN_LEFT_MID, 270, 0);
 
     s_dd_type = lv_dropdown_create(r1);
-    lv_dropdown_set_options(s_dd_type, "UART\nMQTT");
+    lv_dropdown_set_options(s_dd_type, "UART\nMQTT\nTCP");
     lv_obj_set_size(s_dd_type, 120, 32);
     lv_obj_align(s_dd_type, LV_ALIGN_LEFT_MID, 310, 0);
     lv_obj_set_style_text_font(s_dd_type, &lv_font_montserrat_12, 0);
@@ -323,6 +338,40 @@ static void build_add_form(lv_obj_t *parent)
     lv_textarea_set_one_line(s_ta_topic, true);
     lv_textarea_set_placeholder_text(s_ta_topic, "daq/device1/data");
     lv_obj_set_style_text_font(s_ta_topic, &lv_font_montserrat_12, 0);
+
+    /* Row: TCP params (host + port) */
+    s_row_tcp = lv_obj_create(s_add_form);
+    lv_obj_set_size(s_row_tcp, LV_PCT(100), 40);
+    lv_obj_set_pos(s_row_tcp, 0, 50);
+    lv_obj_set_style_bg_opa(s_row_tcp, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(s_row_tcp, 0, 0);
+    lv_obj_set_style_pad_all(s_row_tcp, 0, 0);
+    lv_obj_clear_flag(s_row_tcp, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_add_flag(s_row_tcp, LV_OBJ_FLAG_HIDDEN);
+
+    lv_obj_t *lbl_tcp_host = lv_label_create(s_row_tcp);
+    lv_label_set_text(lbl_tcp_host, "Host:");
+    hmi_style_label_muted(lbl_tcp_host);
+    lv_obj_align(lbl_tcp_host, LV_ALIGN_LEFT_MID, 0, 0);
+
+    s_ta_tcp_host = lv_textarea_create(s_row_tcp);
+    lv_obj_set_size(s_ta_tcp_host, 280, 32);
+    lv_obj_align(s_ta_tcp_host, LV_ALIGN_LEFT_MID, 44, 0);
+    lv_textarea_set_one_line(s_ta_tcp_host, true);
+    lv_textarea_set_placeholder_text(s_ta_tcp_host, "192.168.1.100");
+    lv_obj_set_style_text_font(s_ta_tcp_host, &lv_font_montserrat_12, 0);
+
+    lv_obj_t *lbl_tcp_port = lv_label_create(s_row_tcp);
+    lv_label_set_text(lbl_tcp_port, "Port:");
+    hmi_style_label_muted(lbl_tcp_port);
+    lv_obj_align(lbl_tcp_port, LV_ALIGN_LEFT_MID, 338, 0);
+
+    s_ta_tcp_port = lv_textarea_create(s_row_tcp);
+    lv_obj_set_size(s_ta_tcp_port, 100, 32);
+    lv_obj_align(s_ta_tcp_port, LV_ALIGN_LEFT_MID, 382, 0);
+    lv_textarea_set_one_line(s_ta_tcp_port, true);
+    lv_textarea_set_placeholder_text(s_ta_tcp_port, "8080");
+    lv_obj_set_style_text_font(s_ta_tcp_port, &lv_font_montserrat_12, 0);
 
     /* Action row */
     lv_obj_t *r_act = lv_obj_create(s_add_form);

@@ -154,14 +154,3 @@ esp_err_t daq_uart_disconnect(daq_device_t *dev)
     return ESP_OK;
 }
 
-/* ============================================================
- * TCP stubs (minimal implementation – extend as needed)
- * ============================================================ */
-esp_err_t daq_tcp_connect(daq_device_t *dev)
-{
-    ESP_LOGW(TAG, "[%s] TCP DAQ not yet implemented", dev->id);
-    return ESP_ERR_NOT_SUPPORTED;
-}
-
-esp_err_t daq_tcp_poll(daq_device_t *dev)   { return ESP_ERR_NOT_SUPPORTED; }
-esp_err_t daq_tcp_disconnect(daq_device_t *dev) { return ESP_OK; }
