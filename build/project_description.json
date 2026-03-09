@@ -1,7 +1,7 @@
 {
     "version":            "1.2",
     "project_name":       "esp_hmi",
-    "project_version":    "7bc1e45-dirty",
+    "project_version":    "f78a95b-dirty",
     "project_path":       "C:/Work/Project/ESP_HMIV1/ESP_HMI",
     "idf_path":           "C:/esp/v5.5.2/esp-idf",
     "build_dir":          "C:/Work/Project/ESP_HMIV1/ESP_HMI/build",
