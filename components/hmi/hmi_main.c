@@ -111,7 +111,7 @@ const char *hmi_daq_status_str(daq_status_t status)
 {
     switch (status) {
         case DAQ_STATUS_CONNECTED:    return "Connected";
-        case DAQ_STATUS_CONNECTING:   return "Connecting…";
+        case DAQ_STATUS_CONNECTING:   return "Connecting...";
         case DAQ_STATUS_ERROR:        return "Error";
         default:                      return "Disconnected";
     }

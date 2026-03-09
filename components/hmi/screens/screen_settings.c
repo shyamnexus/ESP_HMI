@@ -132,7 +132,7 @@ static void wifi_connect_cb(lv_event_t *e)
     strncpy(args->ssid, ssid, sizeof(args->ssid) - 1);
     strncpy(args->pass, pass, sizeof(args->pass) - 1);
 
-    lv_label_set_text(s_lbl_status, "Connecting…");
+    lv_label_set_text(s_lbl_status, "Connecting...");
     lv_obj_set_style_text_color(s_lbl_status, HMI_COL_WARNING, 0);
 
     s_connecting = true;
