@@ -35,17 +35,23 @@ void app_main(void)
     /* Default event loop (required by Wi-Fi, MQTT, etc.) */
     ESP_ERROR_CHECK(esp_event_loop_create_default());
 
-    /* Board support: I2C, IO expander, LCD panel, touch controller */
-    ESP_LOGI(TAG, "Initialising BSP...");
-    ESP_ERROR_CHECK(bsp_init());
+    /* Wi-Fi driver must run first to claim its DMA-only SRAM buffers
+     * (static RX, mgmt, TX management) before the RGB LCD driver
+     * allocates its own DMA bounce buffers (2 × 16 KB).  Reversing this
+     * order exhausts the internal DMA heap and causes esp_wifi_init() to
+     * return ESP_ERR_NO_MEM. */
+    ESP_LOGI(TAG, "Initialising Wi-Fi driver...");
+    ESP_ERROR_CHECK(daq_wifi_init());
 
     /* DAQ manager: UART and Wi-Fi/MQTT acquisition backends */
     ESP_LOGI(TAG, "Initialising DAQ manager...");
     ESP_ERROR_CHECK(daq_manager_init());
 
-    /* Wi-Fi driver: claim DRAM buffers now, before LVGL allocates objects */
-    ESP_LOGI(TAG, "Initialising Wi-Fi driver...");
-    ESP_ERROR_CHECK(daq_wifi_init());
+    /* Board support: I2C, IO expander, LCD panel, touch controller.
+     * Runs after Wi-Fi so the LCD bounce buffers do not pre-empt the
+     * Wi-Fi DMA pool. */
+    ESP_LOGI(TAG, "Initialising BSP...");
+    ESP_ERROR_CHECK(bsp_init());
 
     /* HMI: LVGL task, screens, data binding */
     ESP_LOGI(TAG, "Initialising HMI...");
