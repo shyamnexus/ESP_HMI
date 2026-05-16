@@ -47,6 +47,31 @@ void app_main(void)
     ESP_LOGI(TAG, "Initialising HMI...");
     ESP_ERROR_CHECK(hmi_init());
 
+    /* Auto-connect Wi-Fi using credentials saved from the Settings screen */
+    {
+        nvs_handle_t nvs_h;
+        char ssid[64] = {0}, pass[64] = {0};
+        if (nvs_open("wifi_cfg", NVS_READONLY, &nvs_h) == ESP_OK) {
+            size_t ssid_len = sizeof(ssid);
+            size_t pass_len = sizeof(pass);
+            nvs_get_str(nvs_h, "ssid", ssid, &ssid_len);
+            nvs_get_str(nvs_h, "pass", pass, &pass_len);
+            nvs_close(nvs_h);
+        }
+        if (ssid[0] != '\0') {
+            ESP_LOGI(TAG, "Auto-connecting to Wi-Fi SSID: %s", ssid);
+            esp_err_t wifi_err = daq_wifi_connect(ssid, pass, 15000);
+            if (wifi_err == ESP_OK) {
+                ESP_LOGI(TAG, "Wi-Fi connected");
+            } else {
+                ESP_LOGW(TAG, "Wi-Fi auto-connect failed (%s) – continuing without Wi-Fi",
+                         esp_err_to_name(wifi_err));
+            }
+        } else {
+            ESP_LOGI(TAG, "No saved Wi-Fi credentials – configure in Settings");
+        }
+    }
+
     /* Load saved DAQ device configurations from NVS */
     daq_manager_load_config();
 

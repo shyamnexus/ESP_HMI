@@ -1,7 +1,7 @@
 {
     "version":            "1.2",
     "project_name":       "esp_hmi",
-    "project_version":    "b258103-dirty",
+    "project_version":    "7069626-dirty",
     "project_path":       "C:/Work/Project/ESP_HMIV1/ESP_HMI",
     "idf_path":           "C:/esp/v5.5.2/esp-idf",
     "build_dir":          "C:/Work/Project/ESP_HMIV1/ESP_HMI/build",
@@ -170,12 +170,12 @@
             "dir": "C:/Work/Project/ESP_HMIV1/ESP_HMI/components/daq",
             "type": "LIBRARY",
             "lib": "__idf_daq",
-            "reqs": [ "driver", "esp_wifi", "esp_netif", "mqtt", "nvs_flash", "json", "log", "freertos" ],
+            "reqs": [ "driver", "esp_wifi", "esp_netif", "lwip", "mqtt", "nvs_flash", "json", "log", "freertos" ],
             "priv_reqs": [],
             "managed_reqs": [],
             "managed_priv_reqs": [],
             "file": "C:/Work/Project/ESP_HMIV1/ESP_HMI/build/esp-idf/daq/libdaq.a",
-            "sources": [ "C:/Work/Project/ESP_HMIV1/ESP_HMI/components/daq/daq_manager.c", "C:/Work/Project/ESP_HMIV1/ESP_HMI/components/daq/daq_uart.c", "C:/Work/Project/ESP_HMIV1/ESP_HMI/components/daq/daq_wifi.c" ],
+            "sources": [ "C:/Work/Project/ESP_HMIV1/ESP_HMI/components/daq/daq_manager.c", "C:/Work/Project/ESP_HMIV1/ESP_HMI/components/daq/daq_uart.c", "C:/Work/Project/ESP_HMIV1/ESP_HMI/components/daq/daq_wifi.c", "C:/Work/Project/ESP_HMIV1/ESP_HMI/components/daq/daq_tcp.c" ],
             "include_dirs": [ "include" ]
         },
         "driver": {
@@ -3051,7 +3051,7 @@
             "prefix": "idf",
             "dir": "C:/Work/Project/ESP_HMIV1/ESP_HMI/components/daq",
             "lib": "__idf_daq",
-            "reqs": [ "driver", "esp_wifi", "esp_netif", "mqtt", "nvs_flash", "json", "log", "freertos" ],
+            "reqs": [ "driver", "esp_wifi", "esp_netif", "lwip", "mqtt", "nvs_flash", "json", "log", "freertos" ],
             "priv_reqs": [],
             "managed_reqs": [],
             "managed_priv_reqs": [],
